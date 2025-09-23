@@ -14,9 +14,12 @@ import {
   Building2,
   TrendingDown,
   Zap,
-  Smartphone
+  Smartphone,
+  Bookmark,
+  BookmarkCheck
 } from "lucide-react";
 import ProgressTracker from "./ProgressTracker";
+import { useBookmarkStatus, useAddBookmark, useRemoveBookmark } from "@/hooks/useBookmarks";
 import type { IncomeStrategy } from "@shared/schema";
 
 interface StrategyCardProps {
@@ -41,6 +44,20 @@ const difficultyColors = {
 export default function StrategyCard({ strategy }: StrategyCardProps) {
   const [isOpen, setIsOpen] = useState(false);
   const CategoryIcon = categoryIcons[strategy.category as keyof typeof categoryIcons] || Briefcase;
+  
+  const { data: bookmarkStatus, isLoading: isBookmarkLoading } = useBookmarkStatus(strategy.id);
+  const addBookmark = useAddBookmark();
+  const removeBookmark = useRemoveBookmark();
+  
+  const isBookmarked = bookmarkStatus?.isBookmarked || false;
+  
+  const handleBookmarkToggle = () => {
+    if (isBookmarked) {
+      removeBookmark.mutate(strategy.id);
+    } else {
+      addBookmark.mutate(strategy.id);
+    }
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -68,11 +85,27 @@ export default function StrategyCard({ strategy }: StrategyCardProps) {
               </Badge>
             </div>
           </div>
-          <div className="text-right">
-            <div className="font-display font-bold text-2xl text-primary" data-testid={`text-income-${strategy.id}`}>
-              {formatCurrency(strategy.potentialIncome)}
+          <div className="flex items-center gap-3">
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={handleBookmarkToggle}
+              disabled={isBookmarkLoading || addBookmark.isPending || removeBookmark.isPending}
+              data-testid={`button-bookmark-${strategy.id}`}
+              className="h-8 w-8"
+            >
+              {isBookmarked ? (
+                <BookmarkCheck className="h-4 w-4 text-primary" />
+              ) : (
+                <Bookmark className="h-4 w-4" />
+              )}
+            </Button>
+            <div className="text-right">
+              <div className="font-display font-bold text-2xl text-primary" data-testid={`text-income-${strategy.id}`}>
+                {formatCurrency(strategy.potentialIncome)}
+              </div>
+              <div className="text-xs text-muted-foreground">potential/year</div>
             </div>
-            <div className="text-xs text-muted-foreground">potential/year</div>
           </div>
         </div>
       </CardHeader>

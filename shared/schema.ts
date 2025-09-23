@@ -57,6 +57,21 @@ export const insertUserProgressSchema = createInsertSchema(userProgress).omit({
 export type InsertUserProgress = z.infer<typeof insertUserProgressSchema>;
 export type UserProgress = typeof userProgress.$inferSelect;
 
+// User Bookmarks/Favorites
+export const userBookmarks = pgTable("user_bookmarks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(), // Session-based user tracking
+  strategyId: varchar("strategy_id").notNull().references(() => incomeStrategies.id),
+  bookmarkedAt: text("bookmarked_at").notNull(), // ISO date string when bookmarked
+});
+
+export const insertUserBookmarkSchema = createInsertSchema(userBookmarks).omit({
+  id: true,
+});
+
+export type InsertUserBookmark = z.infer<typeof insertUserBookmarkSchema>;
+export type UserBookmark = typeof userBookmarks.$inferSelect;
+
 // Category enum for filtering
 export const categories = [
   "High-Paying Jobs",

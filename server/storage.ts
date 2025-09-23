@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type IncomeStrategy, type InsertIncomeStrategy, type UserProgress, type InsertUserProgress, users, incomeStrategies, userProgress } from "@shared/schema";
+import { type User, type InsertUser, type IncomeStrategy, type InsertIncomeStrategy, type UserProgress, type InsertUserProgress, type UserBookmark, type InsertUserBookmark, users, incomeStrategies, userProgress, userBookmarks } from "@shared/schema";
 import { db } from "./db";
 import { eq, ilike, or, and } from "drizzle-orm";
 
@@ -22,6 +22,12 @@ export interface IStorage {
   getProgressForStrategy(userId: string, strategyId: string): Promise<UserProgress | undefined>;
   updateProgress(userId: string, strategyId: string, progress: Partial<InsertUserProgress>): Promise<UserProgress>;
   deleteProgress(userId: string, strategyId: string): Promise<void>;
+  
+  // User Bookmark methods
+  getUserBookmarks(userId: string): Promise<UserBookmark[]>;
+  isBookmarked(userId: string, strategyId: string): Promise<boolean>;
+  addBookmark(userId: string, strategyId: string): Promise<UserBookmark>;
+  removeBookmark(userId: string, strategyId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -148,6 +154,47 @@ export class DatabaseStorage implements IStorage {
       and(
         eq(userProgress.userId, userId),
         eq(userProgress.strategyId, strategyId)
+      )
+    );
+  }
+
+  // User Bookmark methods
+  async getUserBookmarks(userId: string): Promise<UserBookmark[]> {
+    return await db.select().from(userBookmarks).where(eq(userBookmarks.userId, userId));
+  }
+
+  async isBookmarked(userId: string, strategyId: string): Promise<boolean> {
+    const [bookmark] = await db
+      .select()
+      .from(userBookmarks)
+      .where(
+        and(
+          eq(userBookmarks.userId, userId),
+          eq(userBookmarks.strategyId, strategyId)
+        )
+      );
+    return !!bookmark;
+  }
+
+  async addBookmark(userId: string, strategyId: string): Promise<UserBookmark> {
+    const insertData: InsertUserBookmark = {
+      userId,
+      strategyId,
+      bookmarkedAt: new Date().toISOString(),
+    };
+
+    const [bookmark] = await db
+      .insert(userBookmarks)
+      .values(insertData)
+      .returning();
+    return bookmark;
+  }
+
+  async removeBookmark(userId: string, strategyId: string): Promise<void> {
+    await db.delete(userBookmarks).where(
+      and(
+        eq(userBookmarks.userId, userId),
+        eq(userBookmarks.strategyId, strategyId)
       )
     );
   }

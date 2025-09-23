@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertIncomeStrategySchema, insertUserProgressSchema } from "@shared/schema";
+import { insertIncomeStrategySchema, insertUserProgressSchema, insertUserBookmarkSchema } from "@shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -111,6 +111,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting progress:", error);
       res.status(500).json({ error: "Failed to delete progress" });
+    }
+  });
+
+  // User Bookmarks API routes
+  app.get("/api/bookmarks", async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const bookmarks = await storage.getUserBookmarks(userId);
+      res.json(bookmarks);
+    } catch (error) {
+      console.error("Error fetching bookmarks:", error);
+      res.status(500).json({ error: "Failed to fetch bookmarks" });
+    }
+  });
+
+  app.get("/api/bookmarks/:strategyId", async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const strategyId = req.params.strategyId;
+      const isBookmarked = await storage.isBookmarked(userId, strategyId);
+      res.json({ isBookmarked });
+    } catch (error) {
+      console.error("Error checking bookmark status:", error);
+      res.status(500).json({ error: "Failed to check bookmark status" });
+    }
+  });
+
+  app.post("/api/bookmarks/:strategyId", async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const strategyId = req.params.strategyId;
+      
+      // Check if already bookmarked
+      const isBookmarked = await storage.isBookmarked(userId, strategyId);
+      if (isBookmarked) {
+        return res.status(409).json({ error: "Strategy already bookmarked" });
+      }
+      
+      const bookmark = await storage.addBookmark(userId, strategyId);
+      res.status(201).json(bookmark);
+    } catch (error) {
+      console.error("Error adding bookmark:", error);
+      res.status(500).json({ error: "Failed to add bookmark" });
+    }
+  });
+
+  app.delete("/api/bookmarks/:strategyId", async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const strategyId = req.params.strategyId;
+      
+      await storage.removeBookmark(userId, strategyId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error removing bookmark:", error);
+      res.status(500).json({ error: "Failed to remove bookmark" });
     }
   });
 
