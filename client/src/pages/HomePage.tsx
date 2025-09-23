@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { mockStrategies } from "@/data/strategies";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Header from "@/components/Header";
 import HeroSection from "@/components/HeroSection";
 import StatsSection from "@/components/StatsSection";
@@ -7,33 +7,29 @@ import StrategiesGrid from "@/components/StrategiesGrid";
 import Footer from "@/components/Footer";
 import type { IncomeStrategy } from "@shared/schema";
 
+// API function to fetch strategies
+const fetchStrategies = async (category?: string, search?: string): Promise<IncomeStrategy[]> => {
+  const params = new URLSearchParams();
+  if (category && category !== "all") params.append("category", category);
+  if (search?.trim()) params.append("search", search.trim());
+  
+  const response = await fetch(`/api/strategies?${params.toString()}`);
+  if (!response.ok) {
+    throw new Error("Failed to fetch strategies");
+  }
+  return response.json();
+};
+
 export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [showMobileFilters, setShowMobileFilters] = useState(false);
 
-  // Filter strategies based on search and category
-  const filteredStrategies = useMemo(() => {
-    let filtered = mockStrategies;
-
-    // Apply category filter
-    if (selectedCategory !== "all") {
-      filtered = filtered.filter(strategy => strategy.category === selectedCategory);
-    }
-
-    // Apply search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(strategy => 
-        strategy.title.toLowerCase().includes(query) ||
-        strategy.description.toLowerCase().includes(query) ||
-        strategy.requiredSkills.some(skill => skill.toLowerCase().includes(query)) ||
-        strategy.category.toLowerCase().includes(query)
-      );
-    }
-
-    return filtered;
-  }, [searchQuery, selectedCategory]);
+  // Fetch strategies using React Query
+  const { data: strategies = [], isLoading, error } = useQuery({
+    queryKey: ['/api/strategies', selectedCategory, searchQuery],
+    queryFn: () => fetchStrategies(selectedCategory, searchQuery),
+  });
 
   const handleGetStarted = () => {
     // Scroll to strategies section
@@ -57,7 +53,7 @@ export default function HomePage() {
       <main>
         <HeroSection onGetStarted={handleGetStarted} />
         
-        <StatsSection strategies={mockStrategies} />
+        <StatsSection strategies={strategies} />
         
         <section id="strategies" className="py-12">
           <div className="container">
@@ -73,7 +69,7 @@ export default function HomePage() {
             
             <div className="mb-6 flex justify-between items-center">
               <div className="text-sm text-muted-foreground">
-                Showing {filteredStrategies.length} of {mockStrategies.length} strategies
+                {isLoading ? "Loading..." : `Showing ${strategies.length} strategies`}
               </div>
               {(searchQuery || selectedCategory !== "all") && (
                 <button
@@ -89,22 +85,19 @@ export default function HomePage() {
               )}
             </div>
             
-            <StrategiesGrid strategies={filteredStrategies} />
+            <StrategiesGrid strategies={strategies} loading={isLoading} />
             
-            {filteredStrategies.length === 0 && (
+            {error && (
               <div className="text-center py-12">
-                <div className="text-muted-foreground mb-4">
-                  No strategies match your current filters.
+                <div className="text-destructive mb-4">
+                  Error loading strategies. Please try again.
                 </div>
                 <button
-                  onClick={() => {
-                    setSearchQuery("");
-                    setSelectedCategory("all");
-                  }}
+                  onClick={() => window.location.reload()}
                   className="text-primary hover:underline"
-                  data-testid="button-reset-filters"
+                  data-testid="button-retry"
                 >
-                  Reset filters to see all strategies
+                  Retry
                 </button>
               </div>
             )}
