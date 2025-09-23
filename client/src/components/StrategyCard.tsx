@@ -16,6 +16,7 @@ import {
   Zap,
   Smartphone
 } from "lucide-react";
+import ProgressTracker from "./ProgressTracker";
 import type { IncomeStrategy } from "@shared/schema";
 
 interface StrategyCardProps {
@@ -160,14 +161,20 @@ export default function StrategyCard({ strategy }: StrategyCardProps) {
               </ol>
             </div>
 
-            <Button 
-              className="w-full"
-              data-testid={`button-start-${strategy.id}`}
-              onClick={() => console.log(`Starting strategy: ${strategy.title}`)}
-            >
-              <DollarSign className="mr-2 h-4 w-4" />
-              Start This Strategy
-            </Button>
+            <div className="flex gap-2">
+              <ProgressTracker 
+                strategyId={strategy.id} 
+                strategyTitle={strategy.title}
+              />
+              <Button 
+                className="flex-1"
+                data-testid={`button-start-${strategy.id}`}
+                onClick={() => console.log(`Starting strategy: ${strategy.title}`)}
+              >
+                <DollarSign className="mr-2 h-4 w-4" />
+                View Details
+              </Button>
+            </div>
           </CollapsibleContent>
         </Collapsible>
       </CardContent>

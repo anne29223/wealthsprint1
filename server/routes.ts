@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertIncomeStrategySchema } from "@shared/schema";
+import { insertIncomeStrategySchema, insertUserProgressSchema } from "@shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -40,7 +40,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Removed POST endpoint for security - not needed for this MVP
+  // User Progress API routes
+  // Simple session-based user ID (in production, use proper authentication)
+  const getUserId = (req: any) => {
+    if (!req.session.userId) {
+      req.session.userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
+    return req.session.userId;
+  };
+
+  app.get("/api/progress", async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const progress = await storage.getUserProgress(userId);
+      res.json(progress);
+    } catch (error) {
+      console.error("Error fetching user progress:", error);
+      res.status(500).json({ error: "Failed to fetch progress" });
+    }
+  });
+
+  app.get("/api/progress/:strategyId", async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const progress = await storage.getProgressForStrategy(userId, req.params.strategyId);
+      res.json(progress || null);
+    } catch (error) {
+      console.error("Error fetching strategy progress:", error);
+      res.status(500).json({ error: "Failed to fetch strategy progress" });
+    }
+  });
+
+  app.post("/api/progress/:strategyId", async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const strategyId = req.params.strategyId;
+      
+      // Validate request body with strict schema - only allow specific fields
+      const progressValidationSchema = z.object({
+        status: z.enum(["interested", "started", "completed"]).optional(),
+        notes: z.string().optional(),
+        startedAt: z.string().optional(),
+        completedAt: z.string().optional(),
+        results: z.string().optional(),
+      });
+      
+      const validatedData = progressValidationSchema.parse(req.body);
+      
+      // Strip undefined values to avoid passing them to database
+      const progressData = Object.fromEntries(
+        Object.entries(validatedData).filter(([_, value]) => value !== undefined)
+      );
+      
+      const progress = await storage.updateProgress(userId, strategyId, progressData);
+      res.json(progress);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid progress data", details: error.errors });
+      }
+      console.error("Error updating progress:", error);
+      res.status(500).json({ error: "Failed to update progress" });
+    }
+  });
+
+  app.delete("/api/progress/:strategyId", async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      await storage.deleteProgress(userId, req.params.strategyId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting progress:", error);
+      res.status(500).json({ error: "Failed to delete progress" });
+    }
+  });
 
   const httpServer = createServer(app);
 

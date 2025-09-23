@@ -38,6 +38,25 @@ export const insertIncomeStrategySchema = createInsertSchema(incomeStrategies).o
 export type InsertIncomeStrategy = z.infer<typeof insertIncomeStrategySchema>;
 export type IncomeStrategy = typeof incomeStrategies.$inferSelect;
 
+// User Progress Tracking
+export const userProgress = pgTable("user_progress", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(), // For now, we'll use session-based tracking
+  strategyId: varchar("strategy_id").notNull().references(() => incomeStrategies.id),
+  status: text("status").notNull(), // "interested", "started", "completed"
+  notes: text("notes"), // User's notes about their progress
+  startedAt: text("started_at"), // ISO date string when they started
+  completedAt: text("completed_at"), // ISO date string when completed
+  results: text("results"), // What results they achieved
+});
+
+export const insertUserProgressSchema = createInsertSchema(userProgress).omit({
+  id: true,
+});
+
+export type InsertUserProgress = z.infer<typeof insertUserProgressSchema>;
+export type UserProgress = typeof userProgress.$inferSelect;
+
 // Category enum for filtering
 export const categories = [
   "High-Paying Jobs",

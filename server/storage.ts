@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type IncomeStrategy, type InsertIncomeStrategy, users, incomeStrategies } from "@shared/schema";
+import { type User, type InsertUser, type IncomeStrategy, type InsertIncomeStrategy, type UserProgress, type InsertUserProgress, users, incomeStrategies, userProgress } from "@shared/schema";
 import { db } from "./db";
 import { eq, ilike, or, and } from "drizzle-orm";
 
@@ -16,6 +16,12 @@ export interface IStorage {
   searchStrategies(query: string, category?: string): Promise<IncomeStrategy[]>;
   getStrategyById(id: string): Promise<IncomeStrategy | undefined>;
   createStrategy(strategy: InsertIncomeStrategy): Promise<IncomeStrategy>;
+  
+  // User Progress methods
+  getUserProgress(userId: string): Promise<UserProgress[]>;
+  getProgressForStrategy(userId: string, strategyId: string): Promise<UserProgress | undefined>;
+  updateProgress(userId: string, strategyId: string, progress: Partial<InsertUserProgress>): Promise<UserProgress>;
+  deleteProgress(userId: string, strategyId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -77,6 +83,73 @@ export class DatabaseStorage implements IStorage {
       .values(insertStrategy)
       .returning();
     return strategy;
+  }
+
+  // User Progress methods
+  async getUserProgress(userId: string): Promise<UserProgress[]> {
+    return await db.select().from(userProgress).where(eq(userProgress.userId, userId));
+  }
+
+  async getProgressForStrategy(userId: string, strategyId: string): Promise<UserProgress | undefined> {
+    const [progress] = await db.select().from(userProgress).where(
+      and(
+        eq(userProgress.userId, userId),
+        eq(userProgress.strategyId, strategyId)
+      )
+    );
+    return progress || undefined;
+  }
+
+  async updateProgress(userId: string, strategyId: string, progressData: Partial<InsertUserProgress>): Promise<UserProgress> {
+    // Check if progress exists
+    const existing = await this.getProgressForStrategy(userId, strategyId);
+    
+    if (existing) {
+      // Update existing progress - defensively whitelist allowed fields and filter undefined
+      const { status, notes, startedAt, completedAt, results } = progressData;
+      const cleanData = Object.fromEntries(
+        Object.entries({ status, notes, startedAt, completedAt, results })
+          .filter(([_, value]) => value !== undefined)
+      );
+      
+      const [updated] = await db
+        .update(userProgress)
+        .set(cleanData)
+        .where(
+          and(
+            eq(userProgress.userId, userId),
+            eq(userProgress.strategyId, strategyId)
+          )
+        )
+        .returning();
+      return updated;
+    } else {
+      // Create new progress - ensure required fields are present
+      const insertData: InsertUserProgress = {
+        userId,
+        strategyId,
+        status: progressData.status || "interested",
+        notes: progressData.notes || null,
+        startedAt: progressData.startedAt || null,
+        completedAt: progressData.completedAt || null,
+        results: progressData.results || null,
+      };
+      
+      const [created] = await db
+        .insert(userProgress)
+        .values(insertData)
+        .returning();
+      return created;
+    }
+  }
+
+  async deleteProgress(userId: string, strategyId: string): Promise<void> {
+    await db.delete(userProgress).where(
+      and(
+        eq(userProgress.userId, userId),
+        eq(userProgress.strategyId, strategyId)
+      )
+    );
   }
 }
 
