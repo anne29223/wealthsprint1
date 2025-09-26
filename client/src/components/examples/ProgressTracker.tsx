@@ -1,0 +1,1 @@
+import ProgressTracker from '../ProgressTracker'\n\nexport default function ProgressTrackerExample() {\n  return (\n    <div className="p-4">\n      <ProgressTracker \n        strategyId="example-strategy-1" \n        strategyTitle="Software Engineering (FAANG)"\n      />\n    </div>\n  )\n}
